@@ -1,0 +1,131 @@
+
+ 1. Create a field on Account named "Number of Contacts". Populate this field with the number of contacts related to an account. 
+
+
+trigger UpdateContacts on Contact (after insert, after update, after delete, after undelete) {
+    Map<Id, Account>  UpdateAcc = new Map<Id, Account>();
+    
+    if (Trigger.isInsert || Trigger.isUpdate || Trigger.isUndelete) {
+        for (Contact contact : Trigger.new) {
+
+            if (contact.AccountId != null) 
+{
+                UpdateAcc.put(contact.AccountId, new Account(Id = contact.AccountId));
+            }
+        }
+    }
+    
+    if (Trigger.isDelete) {
+        for (Contact contact : Trigger.old) {
+            if (contact.AccountId != null) {
+                UpdateAcc.put(contact.AccountId, new Account(Id = contact.AccountId));
+            }
+        }
+    }
+    
+    List<Account> UpdateAcclist= new List<Account>(UpdateAcc.values());
+    
+    for (Account acc : accountsToUpdateList) {
+        acc.Number_of_Contacts__c = [SELECT COUNT() FROM Contact WHERE AccountId = :acc.Id];
+    }
+    
+    update accountsToUpdateList; 
+}
+
+
+
+
+2. Build a basic lightning component that can query a list of 10 most recently created accounts and display it using a lightning app.
+
+
+HTML CODE
+<template>
+   <lightning-card title="Recent Accounts">
+      <div class="slds-m-around_medium">
+          <template if:true={accounts}>
+                <lightning-datatable
+                    key-field="Id"
+                    data={accounts}
+                    columns={columns}
+                </lightning-datatable>
+            </template>
+            <template if:true={error}>
+                <p>{error}</p>
+            </template>
+        </div>
+    </lightning-card>
+</template>
+
+
+JS CODE
+
+import { LightningElement, wire } from 'lwc';
+import getRecentAccounts from '@salesforce/apex/Accounts.getRecentAccounts';
+
+
+export default class RecentAccountsList extends LightningElement {
+    accounts;
+    columns = columns;
+    error;
+
+    @wire(getRecentAccounts)
+    wiredAccounts({ error, data }) {
+        if (data) {
+            this.accounts = data;
+            this.error = undefined;
+        } else if (error) {
+            this.error = 'Error';
+            this.accounts = undefined;
+        }
+    }
+}
+
+
+Apex Controller 
+
+public with sharing class Accounts {
+    @AuraEnabled(cacheable=true)
+    public static List<Account> getRecentAccounts() {
+        return [SELECT Id, Name, CreatedDate FROM Account ORDER BY CreatedDate DESC LIMIT 10];
+    }
+}
+
+
+
+
+
+ 3. Make a basic http callout and print the result using system.debug
+
+1.Remote Site Setting = Gave URL https://postman-echo.com
+
+   
+ 
+public class httpsystem {
+
+    public void makeHttpCallout() {
+        // Define the endpoint URL
+        String endpoint = 'https://postman-echo.com/get?foo1=bar1&foo2=bar2';
+
+        // Create an HTTP request
+        HttpRequest request = new HttpRequest();
+        request.setEndpoint(endpoint);
+        request.setMethod('GET');
+
+        // Create an HTTP client to send the request
+        Http http = new Http();
+        HttpResponse response = http.send(request);
+
+        if (response.getStatusCode() == 200) {
+            String responseBody = response.getBody();
+            System.debug('HTTP Response: ' + responseBody);
+        } else {
+            System.debug('HTTP Request Failed: ' + response.getStatusCode());
+        }
+    }
+}
+
+Debug From Anonymous window
+
+httpsystem httpExample = new httpsystem();
+httpExample.makeHttpCallout(); 
+
